@@ -3,29 +3,46 @@ import {
   Ionicons,
   MaterialCommunityIcons,
 } from '@expo/vector-icons';
-import { Image, StyleSheet, Text, View } from 'react-native';
+
+import { useState } from 'react';
+
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
 
 type CalculatorButtonProps = {
   text?: string;
   color?: 'dark' | 'light' | 'orange';
   icon?: boolean;
+  onPress: () => void;
 };
 
 function CalculatorButton({
   text,
   color = 'dark',
   icon = false,
+  onPress,
 }: CalculatorButtonProps) {
   return (
-    <View
-      style={[
+    <Pressable
+      onPress={onPress}
+
+      style={({ pressed }) => [
         styles.button,
 
         color === 'dark' && styles.darkButton,
         color === 'light' && styles.lightButton,
         color === 'orange' && styles.orangeButton,
+
+        pressed && styles.pressedButton,
       ]}
     >
+
       {icon ? (
         <MaterialCommunityIcons
           name="backspace-outline"
@@ -42,28 +59,394 @@ function CalculatorButton({
           {text}
         </Text>
       )}
-    </View>
+
+    </Pressable>
   );
 }
 
+
 export default function Index() {
+
+  const [task, setTask] = useState<string>('');
+  const [history, setHistory] = useState<string>('');
+
+  const [justSolved, setJustSolved] = useState(false);
+
+  function normalizeTask(value: string) {
+    return value
+      .replaceAll('÷', '/')
+      .replaceAll('×', '*')
+      .replaceAll(',', '.');
+  }
+
+  function solveTask(value: string) {
+    const newTask = normalizeTask(value);
+
+    const answer = eval(newTask);
+
+    return answer;
+  }
+
+  function formatNumber(value: number) {
+    return String(value).replace('.', ',');
+  }
+
+  const clickNumber = (number: string): void => {
+    
+    if (justSolved || task === 'Error') {
+      setTask(number);
+      setHistory('');
+      setJustSolved(false);
+
+      return;
+    }
+
+    setTask(task + number);
+  };
+
+  const clickAC = (): void => {
+    setTask('');
+    setHistory('');
+    setJustSolved(false);
+  };
+
+  const clickBackspace = (): void => {
+
+    if (task === 'Error') {
+      clickAC();
+
+      return;
+    }
+
+    setTask(task.slice(0, -1));
+
+    setHistory('');
+    setJustSolved(false);
+  };
+
+  const clickOperator = (
+    operator: '+' | '-' | '×' | '÷'
+  ): void => {
+
+    if (task === 'Error') {
+      return;
+    }
+
+    if (task.length === 0) {
+
+      if (operator === '-') {
+        setTask('-');
+      }
+
+      return;
+    }
+
+    const lastSymbol = task[task.length - 1];
+
+    if (
+      lastSymbol === '+' ||
+      lastSymbol === '-' ||
+      lastSymbol === '×' ||
+      lastSymbol === '÷'
+    ) {
+      setTask(
+        task.slice(0, -1) + operator
+      );
+    }
+    else {
+      setTask(task + operator);
+    }
+
+
+    setHistory('');
+    setJustSolved(false);
+  };
+
+
+  const clickComma = (): void => {
+
+    if (justSolved || task === 'Error') {
+      setTask('0,');
+      setHistory('');
+      setJustSolved(false);
+
+      return;
+    }
+
+    const parts = task.split(
+      /[+\-×÷]/
+    );
+
+    const lastNumber =
+      parts[parts.length - 1];
+
+    if (lastNumber.includes(',')) {
+      return;
+    }
+
+    if (lastNumber === '') {
+      setTask(task + '0,');
+    }
+    else {
+      setTask(task + ',');
+    }
+
+
+    setHistory('');
+    setJustSolved(false);
+  };
+
+
+  const clickPlusMinus = (): void => {
+
+    if (
+      task.length === 0 ||
+      task === 'Error'
+    ) {
+      return;
+    }
+
+    const match = task.match(
+      /(\d+(?:[.,]\d+)?)$/
+    );
+
+
+    if (!match) {
+      return;
+    }
+
+
+    const number = match[1];
+
+    const start =
+      match.index ?? 0;
+
+    const beforeNumber =
+      task.slice(0, start);
+
+
+    if (beforeNumber.endsWith('-')) {
+
+      const withoutMinus =
+        beforeNumber.slice(0, -1);
+
+      const previousSymbol =
+        withoutMinus.slice(-1);
+
+      const unaryMinus =
+        withoutMinus === '' ||
+        previousSymbol === '+' ||
+        previousSymbol === '-' ||
+        previousSymbol === '×' ||
+        previousSymbol === '÷';
+
+
+      if (unaryMinus) {
+        setTask(
+          withoutMinus + number
+        );
+      }
+
+      else {
+        setTask(
+          withoutMinus +
+          '+' +
+          number
+        );
+      }
+
+
+      setHistory('');
+      setJustSolved(false);
+
+      return;
+    }
+
+    if (beforeNumber.endsWith('+')) {
+
+      setTask(
+        beforeNumber.slice(0, -1) +
+        '-' +
+        number
+      );
+
+
+      setHistory('');
+      setJustSolved(false);
+
+      return;
+    }
+
+    setTask(
+      beforeNumber +
+      '-' +
+      number
+    );
+
+
+    setHistory('');
+    setJustSolved(false);
+  };
+
+  const clickPercent = (): void => {
+
+    if (
+      task.length === 0 ||
+      task === 'Error'
+    ) {
+      return;
+    }
+
+    const match = task.match(
+      /(\d+(?:[.,]\d+)?)$/
+    );
+
+
+    if (!match) {
+      return;
+    }
+
+
+    const numberString =
+      match[1];
+
+
+    const number =
+      Number(
+        numberString.replace(',', '.')
+      );
+
+
+    const start =
+      match.index ?? 0;
+
+    const beforeNumber =
+      task.slice(0, start);
+
+
+    const operator =
+      beforeNumber.slice(-1);
+
+
+    let percentValue =
+      number / 100;
+
+    if (
+      operator === '+' ||
+      operator === '-'
+    ) {
+
+      const leftExpression =
+        beforeNumber.slice(0, -1);
+
+
+      if (leftExpression.length > 0) {
+
+        try {
+
+          const baseValue =
+            solveTask(leftExpression);
+
+
+          percentValue =
+            baseValue *
+            number /
+            100;
+
+        }
+        catch {
+          return;
+        }
+
+      }
+
+    }
+
+    const newNumber =
+      formatNumber(percentValue);
+
+
+    setTask(
+      task.slice(0, start) +
+      newNumber
+    );
+
+
+    setHistory('');
+    setJustSolved(false);
+  };
+
+  const clickEqual = (): void => {
+
+    if (
+      task.length === 0 ||
+      task === 'Error'
+    ) {
+      return;
+    }
+
+
+    const lastSymbol =
+      task[task.length - 1];
+
+    if (
+      lastSymbol === '+' ||
+      lastSymbol === '-' ||
+      lastSymbol === '×' ||
+      lastSymbol === '÷'
+    ) {
+      return;
+    }
+
+
+    try {
+
+      const currentTask =
+        task;
+
+
+      const answer =
+        solveTask(currentTask);
+
+
+      setHistory(currentTask);
+
+      setTask(
+        formatNumber(answer)
+      );
+
+      setJustSolved(true);
+
+    }
+    catch {
+
+      setHistory('');
+
+      setTask('Error');
+
+      setJustSolved(true);
+    }
+  };
+
   return (
     <View style={styles.screen}>
 
       <View style={styles.phone}>
 
         <View style={styles.statusBar}>
+
           <Text style={styles.time}>
             09:41
           </Text>
+
 
           <Image
             source={require('../../assets/images/icon1.jpg')}
             style={styles.statusImage}
             resizeMode="contain"
           />
-        </View>
 
+        </View>
 
         <View style={styles.topButtons}>
 
@@ -74,6 +457,7 @@ export default function Index() {
               color="#ffffff"
             />
           </View>
+
 
           <View style={styles.smallRoundButton}>
             <Ionicons
@@ -87,12 +471,20 @@ export default function Index() {
 
         <View style={styles.display}>
 
-          <Text style={styles.example}>
-            38 670÷50 000
+          <Text
+            style={styles.example}
+            numberOfLines={1}
+          >
+            {history}
           </Text>
 
-          <Text style={styles.answer}>
-            0,7734
+
+          <Text
+            style={styles.answer}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {task || '0'}
           </Text>
 
         </View>
@@ -104,87 +496,184 @@ export default function Index() {
             <CalculatorButton
               color="light"
               icon={true}
+              onPress={clickBackspace}
             />
+
 
             <CalculatorButton
               text="AC"
               color="light"
+              onPress={clickAC}
             />
+
 
             <CalculatorButton
               text="%"
               color="light"
+              onPress={clickPercent}
             />
+
 
             <CalculatorButton
               text="÷"
               color="orange"
+              onPress={() =>
+                clickOperator('÷')
+              }
             />
 
           </View>
 
           <View style={styles.row}>
 
-            <CalculatorButton text="7" />
+            <CalculatorButton
+              text="7"
+              onPress={() =>
+                clickNumber('7')
+              }
+            />
 
-            <CalculatorButton text="8" />
 
-            <CalculatorButton text="9" />
+            <CalculatorButton
+              text="8"
+              onPress={() =>
+                clickNumber('8')
+              }
+            />
+
+
+            <CalculatorButton
+              text="9"
+              onPress={() =>
+                clickNumber('9')
+              }
+            />
+
 
             <CalculatorButton
               text="×"
               color="orange"
+              onPress={() =>
+                clickOperator('×')
+              }
             />
 
           </View>
 
           <View style={styles.row}>
 
-            <CalculatorButton text="4" />
+            <CalculatorButton
+              text="4"
+              onPress={() =>
+                clickNumber('4')
+              }
+            />
 
-            <CalculatorButton text="5" />
 
-            <CalculatorButton text="6" />
+            <CalculatorButton
+              text="5"
+              onPress={() =>
+                clickNumber('5')
+              }
+            />
+
+
+            <CalculatorButton
+              text="6"
+              onPress={() =>
+                clickNumber('6')
+              }
+            />
+
 
             <CalculatorButton
               text="−"
               color="orange"
+              onPress={() =>
+                clickOperator('-')
+              }
             />
 
           </View>
 
           <View style={styles.row}>
 
-            <CalculatorButton text="1" />
+            <CalculatorButton
+              text="1"
+              onPress={() =>
+                clickNumber('1')
+              }
+            />
 
-            <CalculatorButton text="2" />
 
-            <CalculatorButton text="3" />
+            <CalculatorButton
+              text="2"
+              onPress={() =>
+                clickNumber('2')
+              }
+            />
+
+
+            <CalculatorButton
+              text="3"
+              onPress={() =>
+                clickNumber('3')
+              }
+            />
+
 
             <CalculatorButton
               text="+"
               color="orange"
+              onPress={() =>
+                clickOperator('+')
+              }
             />
 
           </View>
 
           <View style={styles.row}>
 
-            <View style={[styles.button, styles.darkButton]}>
+
+            {/* +/- */}
+
+            <Pressable
+              onPress={clickPlusMinus}
+
+              style={({ pressed }) => [
+                styles.button,
+                styles.darkButton,
+
+                pressed &&
+                styles.pressedButton,
+              ]}
+            >
               <Image
                 source={require('../../assets/images/icon2.png')}
                 style={styles.plusMinusImage}
                 resizeMode="contain"
               />
-            </View>
+            </Pressable>
 
-            <CalculatorButton text="0" />
 
-            <CalculatorButton text="," />
+            <CalculatorButton
+              text="0"
+              onPress={() =>
+                clickNumber('0')
+              }
+            />
+
+
+            <CalculatorButton
+              text=","
+              onPress={clickComma}
+            />
+
 
             <CalculatorButton
               text="="
               color="orange"
+              onPress={clickEqual}
             />
 
           </View>
@@ -197,8 +686,8 @@ export default function Index() {
   );
 }
 
-
 const styles = StyleSheet.create({
+
   screen: {
     flex: 1,
 
@@ -207,6 +696,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
 
   phone: {
     width: 430,
@@ -219,6 +709,7 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
 
+
   statusBar: {
     width: 310,
     height: 30,
@@ -230,6 +721,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+
   time: {
     color: '#ffffff',
 
@@ -237,12 +729,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  statusIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-
-    gap: 5,
-  },
 
   statusImage: {
     width: 86,
@@ -250,6 +736,7 @@ const styles = StyleSheet.create({
 
     resizeMode: 'contain',
   },
+
 
   topButtons: {
     marginTop: 16,
@@ -261,6 +748,7 @@ const styles = StyleSheet.create({
 
     paddingHorizontal: 2,
   },
+
 
   smallRoundButton: {
     width: 53,
@@ -277,6 +765,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+
   display: {
     height: 275,
 
@@ -286,6 +775,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
 
+
   example: {
     color: '#77777c',
 
@@ -294,19 +784,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
+
   answer: {
+    width: '100%',
+
     color: '#ffffff',
 
     fontSize: 77,
     fontWeight: '400',
 
     lineHeight: 86,
+
+    textAlign: 'right',
   },
+
 
   plusMinusImage: {
     width: 50,
     height: 50,
   },
+
 
   keyboard: {
     width: 407,
@@ -315,6 +812,7 @@ const styles = StyleSheet.create({
 
     marginTop: 'auto',
   },
+
 
   row: {
     width: 407,
@@ -326,6 +824,7 @@ const styles = StyleSheet.create({
     marginBottom: 11,
   },
 
+
   button: {
     width: 92,
     height: 92,
@@ -336,17 +835,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+
   darkButton: {
     backgroundColor: '#333333',
   },
+
 
   lightButton: {
     backgroundColor: '#5A5A5A',
   },
 
+
   orangeButton: {
     backgroundColor: '#FF9500',
   },
+
+
+  pressedButton: {
+    opacity: 0.6,
+  },
+
 
   buttonText: {
     color: '#ffffff',
@@ -359,7 +867,9 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
 
+
   lightButtonText: {
     color: '#ffffff',
   },
+
 });
